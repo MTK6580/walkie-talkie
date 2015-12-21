@@ -1,2 +1,1 @@
-# walkie-talkie
-对讲机
+#MTK6580

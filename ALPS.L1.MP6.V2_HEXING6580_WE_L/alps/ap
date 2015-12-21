@@ -1,0 +1,237 @@
+#!/usr/bin/perl
+# 
+$NUM_ARGV = @ARGV;
+#($sec_log,$min_log,$hour_log,$mday_log,$mon_log,$year_log,$wday_log,$yday_log,$isdst_log) = localtime(time);
+#$current_time_str = sprintf("_%04d%02d%02d_%02d%02d", $year_log + 1900, $mon_log +1, $mday_log, $hour_log, $min_log);
+
+$project=`cat MTK_PROJECT`;
+$project=~s/\n//gs;
+
+$new_file_name_str = "package.zip";
+$build_out_put_path = ".\/out\/target\/product\/${project}";
+$database = "database";
+$image = "image";
+$other= "other";
+$projectConfigFile = ".\/device\/hexing\/${project}\/ProjectConfig.mk";
+$checksum_tool="./CKSM_Gen";
+$platform="";
+open (FILE_HANDLE, "<$projectConfigFile") or die "cannot open $projectConfigFile\n";
+while (<FILE_HANDLE>) 
+{
+	if(!/^#/)
+	{
+		if (/^(\S+)\s*=\s*([^\n\t\r\f]+)/) 
+		{
+			#print "==1==left:${1}===right:${2}===\n";
+			if("CUSTOM_BUILD_PACKAGE" eq $1)
+			{
+				$new_file_name_str = $2; # . $current_time_str;
+			}
+			if("MTK_PLATFORM" eq $1)
+			{
+				$mtk_platform = $2;
+			}
+			if("MTK_EMMC_SUPPORT" eq $1)
+			{
+				$mtk_emmc_support = $2;
+			}
+			if("CUSTOM_MODEM" eq $1)
+			{
+				$custom_modem = $2;
+			}
+			if("MTK_PLATFORM" eq $1)
+			{
+				$platform = lc($2);
+			}
+						
+			
+		}
+	}
+}
+close FILE_HANDLE;
+
+
+system("mkdir -p ltk_cfg/battery/kernel");
+system("cp -rf kernel-3.10/drivers/misc/mediatek/mach/${platform}/${project}/power/* ltk_cfg/battery/kernel/");
+
+system("mkdir -p ltk_cfg/audio");
+system("cp vendor/mediatek/proprietary/custom/common/cgen/cfgdefault/audio_ver1_volume_custom_default.h ltk_cfg/audio/audio_ver1_volume_custom_default.h");
+
+system("cp $projectConfigFile ltk_cfg/ProjectConfig.mk");
+
+system("cp sw_feature_list.txt ltk_cfg/");
+
+
+@databaseArray=(
+			".\/vendor\/mediatek\/proprietary\/custom\/hexing6580_we_l\/modem\/${custom_modem}\/BPLGUInfoCustomAppSrcP_*",
+			".\/vendor\/mediatek\/proprietary\/custom\/hexing6580_we_l\/modem\/${custom_modem}\/DbgInfo_*",
+			".\/out\/target\/product\/${project}\/obj\/CGEN\/APDB_MT*",
+		);
+
+@binArray1=(
+			"$build_out_put_path\/preloader_${project}.bin",
+			"$build_out_put_path\/lk.bin",
+			"$build_out_put_path\/logo.bin",
+			"$build_out_put_path\/${mtk_platform}_Android_scatter.txt"
+
+		);
+@binArray2=(
+			"boot.img",
+			"recovery.img",
+			"secro.img",
+			"system.img",
+			"userdata.img",
+		);
+
+
+if($mtk_emmc_support eq "yes")
+{
+#	push(@binArray1,"$build_out_put_path\/EBR*");
+#	push(@binArray1,"$build_out_put_path\/MBR");
+	push(@binArray2,"cache.img");
+}
+@infoArray=(
+#			"$build_out_put_path\/kernel_${project}.bin",
+			"$build_out_put_path\/ramdisk.img",
+			"$build_out_put_path\/android-info.txt",
+			"$build_out_put_path\/clean_steps.mk",
+			"$build_out_put_path\/ramdisk-recovery.img",
+			"$build_out_put_path\/installed-files.txt",
+			"$build_out_put_path\/previous_build_config.mk",
+			"$build_out_put_path\/kernel",
+		);
+sub system_exe
+{
+    (my $first) = @_;
+	print "$first\n";
+	system($first);
+}
+foreach(@databaseArray)
+{
+   if(!/\*/)
+   {
+      my $bin = $_;
+      die "Not exist $bin!!!!\n" if (!-e "$bin")
+   }
+}
+foreach(@binArray1)
+{
+   if(!/\*/)
+   {
+      my $bin = $_;
+      die "Not exist $bin!!!!\n" if (!-e "$bin")
+   }
+}
+foreach(@binArray2)
+{
+   if(!/\*/)
+   {
+      my $bin = $_;
+      die "Not exist $bin!!!!\n" if (!-e "$build_out_put_path\/$bin")
+   }
+}
+foreach(@infoArray)
+{
+   if(!/\*/)
+   {
+      my $bin = $_;
+      die "Not exist $bin!!!!\n" if (!-e "$bin")
+   }
+}
+
+#bin
+system("rm -rf $build_out_put_path\/$image");
+system("mkdir -p $build_out_put_path\/$image");
+foreach(@binArray1)
+{
+      my $bin = $_;
+      system("cp $bin $build_out_put_path\/$image");
+}
+
+foreach(@binArray2)
+{
+      my $bin = $_;
+      system("mv $build_out_put_path\/$bin $build_out_put_path\/$image");
+}
+
+if (-e "$build_out_put_path\/fat_sparse.img")
+{
+   system("mv $build_out_put_path\/fat_sparse.img $build_out_put_path\/$image");  
+   open (FILE_HANDLE, "<$build_out_put_path\/$image\/${mtk_platform}_Android_scatter.txt") or die "cannot open $build_out_put_path\/$image\/${mtk_platform}_Android_scatter.txt\n";
+   @line=<FILE_HANDLE>;
+   close FILE_HANDLE;
+   
+   $write_tempscatter = "$build_out_put_path\/$image\/${mtk_platform}_Android_scatter.txt";
+   die "can NOT open $write_tempscatter:$!" if ( ! open OUT_FILE, ">$write_tempscatter");
+   
+   $count =@line;
+	for ($iter=0; $iter<$count; $iter++){
+ 		print OUT_FILE @line[$iter];
+		if(@line[$iter] eq "  partition_name: FAT\n")
+		{
+   		print OUT_FILE "  file_name: fat_sparse.img\n";
+			print OUT_FILE "  is_download: true\n";
+			$iter =$iter + 2;
+		}
+
+	}
+   close OUT_FILE;
+	#system("cp $build_out_put_path\/$image\/${mtk_platform}_Android_scatter.txt $build_out_put_path/");  
+   
+}
+if (-e $checksum_tool)
+{
+   system("chmod +x $checksum_tool");
+   system("$checksum_tool -s $build_out_put_path\/$image $build_out_put_path\/$image/MT6580_Android_scatter.txt -d $build_out_put_path\/$image $build_out_put_path\/$image/");
+   
+}
+
+
+#database
+system("rm -rf $build_out_put_path\/$database");
+system("mkdir -p $build_out_put_path\/$database");
+foreach(@databaseArray)
+{
+   my $bin = $_;
+   system("cp $bin $build_out_put_path\/$database") ;
+}
+
+#other
+system("rm -rf $build_out_put_path\/$other");
+system("mkdir -p $build_out_put_path\/$other");
+foreach(@infoArray)
+{
+   my $bin = $_;
+   system("cp $bin $build_out_put_path\/$other") ;
+}
+
+
+
+system_exe("7z a -tzip $new_file_name_str ltk_cfg/");
+system_exe("7z a -tzip $new_file_name_str $build_out_put_path\/$image/");
+system_exe("7z a -tzip $new_file_name_str $build_out_put_path\/$database/");
+system_exe("7z a -tzip $new_file_name_str $build_out_put_path\/$other/");
+
+foreach(@binArray2)
+{
+      my $bin = $_;
+      system("mv $build_out_put_path\/$image\/$bin $build_out_put_path/");
+}
+if (-e "$build_out_put_path\/$image\/fat_sparse.img")
+{
+   system("mv $build_out_put_path\/$image\/fat_sparse.img $build_out_put_path/");  
+}
+if (-e "/media/workspace1/release/")
+{
+   system_exe("mv $new_file_name_str.zip /media/workspace1/release/$new_file_name_str.zip");
+}
+
+
+
+#if($NUM_ARGV != 0 && $ARGV[0] eq "cp")
+#{
+#   my $url = readpipe("svn info \| grep URL:\|awk \'\{print \$2\}\' ");
+#chomp($url);
+#$url =~ s/\/trunk\/alps//igs;
+#   system_exe("svn cp -m $new_file_name_str ../ $url\/release/$new_file_name_str > ~tmp_svn_tag_output" );
+#}

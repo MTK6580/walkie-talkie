@@ -1,0 +1,75 @@
+#!/usr/bin/perl
+
+$lentek_project="";
+$lentek_customer="";
+$lentek_pcb_verno="";
+
+if($#ARGV == 2)
+{
+	# lentek_project
+	if($ARGV[0])
+	{
+		$lentek_project=lc($ARGV[0]);
+		print "lentek_project=$lentek_project\n";
+	}
+	else
+	{
+		die "lentek_project is not defined ";
+	}
+	
+	# lentek_pcb_verno
+	if($ARGV[1])
+	{
+		$lentek_pcb_verno=lc($ARGV[1]);
+		print "lentek_pcb_verno=$lentek_pcb_verno\n";
+	}
+	else
+	{
+		die "lentek_pcb_verno is not defined ";
+	}
+	
+	# lentek_customer
+	if($ARGV[2])
+	{
+		$lentek_customer=lc($ARGV[2]);
+		print "lentek_customer=$lentek_customer\n";
+	}
+	else
+	{
+		die "lentek_customer is not defined ";
+	}
+	
+}
+else
+{
+	die "copy parameters error, pls input again,just like:./allcopy v540 pcb01 ltk01a\n";
+}
+
+#resync project codegen.dws file to main path
+print "resync codegen.dws file now---------------\n";
+if (-e "../lentek/${lentek_project}/share/${lentek_pcb_verno}/codegen.dws")
+{
+	print "rsync codegen.dws file from branch to main path\n";
+	p_system("cp -f ../lentek/${lentek_project}/share/${lentek_pcb_verno}/codegen.dws bootable/bootloader/lk/target/hexing6580_we_l/dct/dct/codegen.dws");
+	p_system("cp -f ../lentek/${lentek_project}/share/${lentek_pcb_verno}/codegen.dws bootable/bootloader/preloader/custom/hexing6580_we_l/dct/dct/codegen.dws");
+	p_system("cp -f ../lentek/${lentek_project}/share/${lentek_pcb_verno}/codegen.dws kernel-3.10/drivers/misc/mediatek/mach/mt6580/hexing6580_we_l/dct/dct/codegen.dws");
+	p_system("cp -f ../lentek/${lentek_project}/share/${lentek_pcb_verno}/codegen.dws vendor/mediatek/proprietary/custom/hexing6580_we_l/kernel/dct/dct/codegen.dws");
+}
+else
+{
+	die "rsync, codegen.dws file is not exist\n";
+}
+
+print "rsync lentek project files finished\n";
+
+sub p_system
+{
+	my ($cmd) = @_;
+	my ($debugp) = 0;
+	my $result;
+	($debugp != 0) && print("$cmd\n");
+	($performanceChk == 1) && print &CurrTimeStr . " system $cmd\n";
+	$result = system("$cmd");
+	($performanceChk == 1) && print &CurrTimeStr . " exit $cmd\n";
+	return $result;
+}

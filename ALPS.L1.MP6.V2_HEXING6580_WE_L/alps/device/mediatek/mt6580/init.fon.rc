@@ -1,0 +1,10 @@
+on init
+    mkdir /fat 0700 root root
+on fs
+    write /proc/bootprof "INIT:PROTECT:fat start"
+    mount ubifs ubi@fat /fat nosuid nodev wait
+    write /proc/bootprof "INIT:PROTECT:fat end"
+    # Set SELinux security contexts on upgrade or policy update.
+    restorecon_recursive /fat    
+on post-fs
+    exec /system/bin/vdc fatcreation

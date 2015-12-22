@@ -1,0 +1,33 @@
+# ==============================================
+# Policy File of /system/bin mc64xxd Executable File 
+
+
+# ==============================================
+# Type Declaration
+# ==============================================
+
+type mc64xxd_exec , exec_type, file_type;
+type mc64xxd ,domain;
+
+# ==============================================
+# Android Policy Rule
+# ==============================================
+
+# ==============================================
+# NSA Policy Rule
+# ==============================================
+
+# ==============================================
+# MTK Policy Rule
+# ==============================================
+
+#permissive mc64xxd;
+init_daemon_domain(mc64xxd)
+#unconfined_domain(mc64xxd)
+
+allow mc64xxd gsensor_device:chr_file { create open read write ioctl };
+allow mc64xxd msensor_device:chr_file { create open read write ioctl };
+allow mc64xxd self:capability dac_override;
+allow mc64xxd system_data_file:dir { open read write add_name create remove_name };
+allow mc64xxd system_data_file:file { create open write ioctl setattr };
+allow mc64xxd sysfs:file { create open read write };
